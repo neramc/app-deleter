@@ -1,9 +1,8 @@
 name: release
 
-# 빌드가 시작되면 다음 버전 태그(vX.Y.Z)를 자동으로 계산·푸시하고,
-# Windows 바이너리를 빌드해 그 태그의 GitHub Release에 업로드한다.
-# - 수동 실행(workflow_dispatch): 최신 v* 태그에서 bump(기본 patch)한 다음 태그를 푸시
-# - v* 태그 푸시: 해당 태그로 그대로 릴리스(추가 bump 없음)
+# 빌드가 시작되면 다음 버전 태그(vX.Y.Z)를 자동 계산·푸시하고,
+# 메인 앱(app-deleter.exe)과 그 앱을 임베드한 커스텀 설치 마법사
+# (App Deleter Setup, NSIS 비의존)를 빌드해 GitHub Release에 업로드한다.
 on:
   push:
     tags:
@@ -30,7 +29,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # 기존 태그를 모두 가져와 다음 버전을 계산하기 위함.
           fetch-depth: 0
 
       - name: Determine and push next version tag
@@ -38,19 +36,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          # 태그 푸시로 트리거된 경우: 그 태그를 그대로 사용(추가 bump 없음).
           if [ "${{ github.ref_type }}" = "tag" ]; then
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "푸시된 태그 사용: ${{ github.ref_name }}"
             exit 0
           fi
-
           git fetch --tags --quiet || true
           latest=$(git tag -l 'v*' --sort=-v:refname | head -n1 || true)
-
           if [ -z "$latest" ]; then
-            # 기존 태그가 없으면 tauri.conf.json의 버전을 시작점으로 사용.
             base=$(node -p "require('./src-tauri/tauri.conf.json').version")
             major=${base%%.*}; rest=${base#*.}; minor=${rest%%.*}; patch=${rest##*.}
           else
@@ -62,13 +55,10 @@ jobs:
               *)     patch=$((patch+1)) ;;
             esac
           fi
-
           next="v${major}.${minor}.${patch}"
-          # 혹시 이미 존재하는 태그면 patch를 올려 충돌 회피.
           while git rev-parse "$next" >/dev/null 2>&1; do
             patch=$((patch+1)); next="v${major}.${minor}.${patch}"
           done
-
           echo "다음 버전 태그: $next"
           git tag "$next"
           git push origin "$next"
@@ -78,7 +68,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -88,19 +77,58 @@ jobs:
       - name: Cache cargo
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: |
+            ./src-tauri -> target
+            ./installer/src-tauri -> target
 
-      - name: Install frontend dependencies
-        run: npm ci
+      # ── 1) 메인 앱(app-deleter.exe) 빌드 ───────────────────────────
+      - name: Build main app
+        run: |
+          npm ci
+          npm run tauri build -- --no-bundle --target x86_64-pc-windows-msvc
 
-      - name: Build and release (Tauri)
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ── 2) 설치 마법사가 임베드할 페이로드로 메인 exe 복사 ───────────
+      - name: Stage payload for installer
+        shell: bash
+        run: |
+          mkdir -p installer/src-tauri/payload
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/app-deleter.exe \
+             installer/src-tauri/payload/app-deleter.exe
+
+      # ── 3) 커스텀 설치 마법사 빌드 ────────────────────────────────
+      - name: Build installer
+        working-directory: installer
+        run: |
+          npm ci
+          npm run tauri build -- --no-bundle --target x86_64-pc-windows-msvc
+
+      # ── 4) 산출물을 ASCII 이름으로 정리 ───────────────────────────
+      - name: Collect artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          mkdir -p out
+          cp installer/src-tauri/target/x86_64-pc-windows-msvc/release/app-deleter-installer.exe \
+             "out/AppDeleter-Setup-${tag}.exe"
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/app-deleter.exe \
+             "out/AppDeleter-${tag}.exe"
+          ls -la out
+
+      # ── 5) 릴리스 생성 및 업로드 ──────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: ${{ steps.version.outputs.tag }}
-          releaseName: "앱 삭제 ${{ steps.version.outputs.tag }}"
-          releaseBody: "자동 빌드된 Windows 설치 파일(NSIS .exe)입니다."
-          releaseDraft: false
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "App Deleter ${{ steps.version.outputs.tag }}"
+          body: |
+            자동 빌드된 Windows 산출물입니다.
+
+            - **AppDeleter-Setup-${{ steps.version.outputs.tag }}.exe** — 커스텀 설치 마법사(권장). 실행 후 설치하면 시작 메뉴·바탕화면 바로가기와 제거 정보가 등록됩니다.
+            - **AppDeleter-${{ steps.version.outputs.tag }}.exe** — 설치 없이 바로 실행하는 단독 실행 파일.
+          draft: false
           prerelease: false
-          args: --target x86_64-pc-windows-msvc
+          files: |
+            out/AppDeleter-Setup-${{ steps.version.outputs.tag }}.exe
+            out/AppDeleter-${{ steps.version.outputs.tag }}.exe

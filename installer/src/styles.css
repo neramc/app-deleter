@@ -1,0 +1,233 @@
+:root {
+  --bg: #fdfffc; /* 메인 배경 */
+  --accent: #41ead4; /* 버튼/강조 */
+  --accent-hover: #34c9b5;
+  --on-accent: #053b35;
+
+  --surface: #ffffff;
+  --text-primary: #1a1d1c;
+  --text-secondary: #5b6260;
+  --stroke: rgba(0, 0, 0, 0.08);
+  --track: rgba(0, 0, 0, 0.06);
+
+  --radius-control: 4px;
+  --radius-card: 8px;
+
+  --font: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-primary);
+  background: var(--bg);
+  user-select: none;
+}
+
+.installer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── Hero ───────────────────────────────────────────── */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 32px 20px;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  border-radius: var(--radius-card);
+  background: var(--accent);
+}
+
+.hero-text h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+}
+
+.hero-text p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ── Body ───────────────────────────────────────────── */
+.body {
+  flex: 1;
+  padding: 8px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.field {
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  outline: none;
+  user-select: text;
+}
+
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(65, 234, 212, 0.25);
+}
+
+.hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 18px;
+}
+
+/* ── Progress ───────────────────────────────────────── */
+.progress-wrap {
+  width: 100%;
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 250ms ease-out;
+}
+
+.progress-msg {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ── Result ─────────────────────────────────────────── */
+.result {
+  text-align: center;
+}
+
+.result-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+.result.success .result-icon {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.result.error .result-icon {
+  background: #ffe3e3;
+  color: #c0392b;
+}
+
+.result h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.result p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.error-text {
+  color: #c0392b !important;
+}
+
+/* ── Actions ────────────────────────────────────────── */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 32px 24px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  padding: 9px 18px;
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: background 120ms ease-out, opacity 120ms ease-out;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-accent:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--stroke);
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: rgba(65, 234, 212, 0.1);
+}

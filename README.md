@@ -20,12 +20,32 @@ Windows에서 설치된 앱을 **실제 전체 데이터 용량 기준으로 정
 - 삭제 버튼 → 확인 후 `UninstallString`을 파싱해 OS 언인스톨러 실행
 - 앱 시작 시 관리자 권한(UAC) 상승 요청 (레지스트리/폴더 스캔 안정화)
 
+## 커스텀 설치 마법사 (`installer/`)
+
+NSIS 등 외부 번들러에 **의존하지 않는** 자체 제작 설치 마법사입니다. 메인 앱과
+동일하게 **Tauri v2 + React 플랫 디자인**(`#FDFFFC` / `#41EAD4`)으로 만들었으며,
+메인 앱 실행 파일을 컴파일 타임에 **임베드**한 단독 `.exe`입니다.
+
+설치 마법사가 하는 일(관리자 권한 불필요, 현재 사용자 계정에 설치):
+
+1. `%LOCALAPPDATA%\AppDeleter`(ASCII 경로)에 `app-deleter.exe` 복사
+2. 시작 메뉴 · 바탕화면 바로가기(.lnk) 생성
+3. 제어판 "프로그램 제거" 목록에 제거 정보 등록 — 제거 시 폴더·바로가기·레지스트리
+   키를 모두 정리하는 자체 완결형 명령(외부 의존 없음)
+
+> 파일/폴더·바로가기 이름은 모두 ASCII(`App Deleter`, `app-deleter.exe`)이며,
+> 한글은 창 제목 등 표시용에만 사용합니다.
+
 ## 개발
 
 ```bash
+# 메인 앱
 npm install
 npm run tauri dev      # 개발 모드 (Windows에서 실행)
-npm run tauri build    # 로컬 번들(NSIS .exe) 생성
+npm run tauri build -- --no-bundle   # 단독 exe 생성(번들 없이)
+
+# 설치 마법사 (메인 exe를 installer/src-tauri/payload/app-deleter.exe 로 먼저 복사)
+cd installer && npm install && npm run tauri build -- --no-bundle
 ```
 
 > Tauri 앱의 실제 동작은 Windows에서만 완전합니다. 비-Windows에서는
@@ -33,8 +53,9 @@ npm run tauri build    # 로컬 번들(NSIS .exe) 생성
 
 ## 릴리스 (자동 빌드)
 
-GitHub Actions(`.github/workflows/release.yml`)가 `windows-latest`에서 빌드하여
-NSIS 산출물을 **GitHub Release에 자동 업로드**합니다. 두 가지 방식이 있습니다:
+GitHub Actions(`.github/workflows/release.yml`)가 `windows-latest`에서
+**메인 앱(`AppDeleter-<tag>.exe`)** 과 **설치 마법사(`AppDeleter-Setup-<tag>.exe`)** 를
+빌드해 **GitHub Release에 자동 업로드**합니다. 두 가지 방식이 있습니다:
 
 - **수동 실행(권장, `workflow_dispatch`)** — Actions → release → Run workflow.
   빌드가 시작되면 최신 `v*` 태그에서 **다음 버전 태그(vX.Y.Z)를 자동으로 계산·푸시**하고
