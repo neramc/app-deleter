@@ -129,8 +129,10 @@ mod windows_impl {
             return None;
         }
 
-        let uninstall_string =
-            get_string(entry, "QuietUninstallString").or_else(|| get_string(entry, "UninstallString"));
+        // 대화형 우선: 앱 본래의 제거 마법사 UI를 띄우는 UninstallString을
+        // 우선 사용하고, 없을 때만 무인(Quiet) 제거 명령으로 폴백한다.
+        let uninstall_string = get_string(entry, "UninstallString")
+            .or_else(|| get_string(entry, "QuietUninstallString"));
         let install_location = get_string(entry, "InstallLocation").filter(|s| !s.trim().is_empty());
         let icon_raw = get_string(entry, "DisplayIcon");
 

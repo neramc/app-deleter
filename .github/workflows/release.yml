@@ -1,12 +1,23 @@
 name: release
 
-# v* 태그를 푸시하면 Windows 바이너리를 빌드하고 GitHub Release에 업로드한다.
-# 수동 실행(workflow_dispatch)도 지원한다.
+# 빌드가 시작되면 다음 버전 태그(vX.Y.Z)를 자동으로 계산·푸시하고,
+# Windows 바이너리를 빌드해 그 태그의 GitHub Release에 업로드한다.
+# - 수동 실행(workflow_dispatch): 최신 v* 태그에서 bump(기본 patch)한 다음 태그를 푸시
+# - v* 태그 푸시: 해당 태그로 그대로 릴리스(추가 bump 없음)
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      bump:
+        description: "버전 증가 단위"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
 
 permissions:
   contents: write
@@ -18,6 +29,50 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 기존 태그를 모두 가져와 다음 버전을 계산하기 위함.
+          fetch-depth: 0
+
+      - name: Determine and push next version tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 태그 푸시로 트리거된 경우: 그 태그를 그대로 사용(추가 bump 없음).
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "푸시된 태그 사용: ${{ github.ref_name }}"
+            exit 0
+          fi
+
+          git fetch --tags --quiet || true
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -n1 || true)
+
+          if [ -z "$latest" ]; then
+            # 기존 태그가 없으면 tauri.conf.json의 버전을 시작점으로 사용.
+            base=$(node -p "require('./src-tauri/tauri.conf.json').version")
+            major=${base%%.*}; rest=${base#*.}; minor=${rest%%.*}; patch=${rest##*.}
+          else
+            ver=${latest#v}
+            major=${ver%%.*}; rest=${ver#*.}; minor=${rest%%.*}; patch=${rest##*.}
+            case "${{ github.event.inputs.bump }}" in
+              major) major=$((major+1)); minor=0; patch=0 ;;
+              minor) minor=$((minor+1)); patch=0 ;;
+              *)     patch=$((patch+1)) ;;
+            esac
+          fi
+
+          next="v${major}.${minor}.${patch}"
+          # 혹시 이미 존재하는 태그면 patch를 올려 충돌 회피.
+          while git rev-parse "$next" >/dev/null 2>&1; do
+            patch=$((patch+1)); next="v${major}.${minor}.${patch}"
+          done
+
+          echo "다음 버전 태그: $next"
+          git tag "$next"
+          git push origin "$next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,9 +98,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # 태그 푸시면 그 태그를, 수동 실행이면 app-v<version>을 사용.
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('app-v{0}', github.run_number) }}
-          releaseName: "앱 삭제 ${{ github.ref_type == 'tag' && github.ref_name || github.run_number }}"
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: "앱 삭제 ${{ steps.version.outputs.tag }}"
           releaseBody: "자동 빌드된 Windows 설치 파일(NSIS .exe)입니다."
           releaseDraft: false
           prerelease: false

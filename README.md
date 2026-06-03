@@ -33,15 +33,22 @@ npm run tauri build    # 로컬 번들(NSIS .exe) 생성
 
 ## 릴리스 (자동 빌드)
 
-`v*` 형식의 태그를 푸시하면 GitHub Actions(`.github/workflows/release.yml`)가
-`windows-latest`에서 빌드하여 NSIS 산출물을 **GitHub Release에 자동 업로드**합니다.
+GitHub Actions(`.github/workflows/release.yml`)가 `windows-latest`에서 빌드하여
+NSIS 산출물을 **GitHub Release에 자동 업로드**합니다. 두 가지 방식이 있습니다:
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+- **수동 실행(권장, `workflow_dispatch`)** — Actions → release → Run workflow.
+  빌드가 시작되면 최신 `v*` 태그에서 **다음 버전 태그(vX.Y.Z)를 자동으로 계산·푸시**하고
+  그 태그로 릴리스합니다. 증가 단위는 입력값 `bump`(`patch`/`minor`/`major`, 기본 `patch`)로 선택.
+  기존 태그가 없으면 `src-tauri/tauri.conf.json`의 버전을 시작점으로 사용합니다.
+- **태그 푸시(`v*`)** — 직접 푸시한 태그로 그대로 릴리스합니다(추가 증가 없음).
 
-수동 실행(`workflow_dispatch`)도 지원합니다.
+  ```bash
+  git tag v0.1.0
+  git push origin v0.1.0
+  ```
+
+> 자동 태그 푸시는 `GITHUB_TOKEN`으로 이루어지므로 워크플로가 재귀적으로 다시
+> 트리거되지 않습니다(무한 루프 없음).
 
 ## 아이콘
 
