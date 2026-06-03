@@ -8,6 +8,16 @@ dist-ssr
 # Rust / Tauri
 src-tauri/target
 src-tauri/gen
+installer/src-tauri/target
+installer/src-tauri/gen
+installer/src-tauri/payload
+uninstaller/src-tauri/target
+uninstaller/src-tauri/gen
+
+# Lock files — 혼동 방지를 위해 저장소에 업로드하지 않는다(빌드 시 재생성).
+# (패턴에 슬래시가 없으므로 모든 하위 디렉터리에 적용된다.)
+Cargo.lock
+package-lock.json
 
 # Logs
 *.log

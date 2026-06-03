@@ -305,7 +305,8 @@ mod windows_impl {
                     continue;
                 }
                 let path = e.path();
-                out.push((normalize(&e.file_name().to_string_lossy()), path.clone()));
+                let parent_norm = normalize(&e.file_name().to_string_lossy());
+                out.push((parent_norm.clone(), path.clone()));
 
                 if let Ok(rd2) = std::fs::read_dir(&path) {
                     for e2 in rd2.flatten() {
@@ -314,10 +315,13 @@ mod windows_impl {
                             .map(|t| t.is_dir() && !t.is_symlink())
                             .unwrap_or(false)
                         {
-                            out.push((
-                                normalize(&e2.file_name().to_string_lossy()),
-                                e2.path(),
-                            ));
+                            let child_norm = normalize(&e2.file_name().to_string_lossy());
+                            let child_path = e2.path();
+                            // 잎 폴더명 자체와, "부모+자식" 결합 키를 모두 등록한다.
+                            // 결합 키는 Publisher\App 패턴(예: Google\Chrome →
+                            // "googlechrome")을 앱 이름과 정확히 매칭시켜준다.
+                            out.push((format!("{parent_norm}{child_norm}"), child_path.clone()));
+                            out.push((child_norm, child_path));
                         }
                     }
                 }
@@ -337,22 +341,23 @@ mod windows_impl {
         }
     }
 
-    /// 폴더명과 앱 이름의 강한 일치 판정(오탐 최소화):
-    /// 완전 일치, 또는 짧은 쪽이 4자 이상이면서 긴 쪽의 접두사이고
-    /// 길이 차가 2배를 넘지 않는 경우만 매칭으로 본다.
+    /// 폴더명과 앱 이름의 강한 일치 판정(오탐 최소화).
+    ///
+    /// 핵심 원칙: **폴더명이 앱 이름의 (짧은) 접두사인 경우는 매칭하지 않는다.**
+    /// 그래야 "Microsoft"가 "Microsoft GameInput"에, "Google"이 "Google Chrome"에
+    /// 잘못 매칭되어 거대한 공용 폴더를 합산하는 오류를 막는다.
+    ///   * 완전 일치 → 매칭
+    ///   * 폴더명 = 앱 + 짧은 접미사(버전 등, 6자 이내) → 매칭
     fn strong_match(folder: &str, app: &str) -> bool {
-        if folder.is_empty() || app.is_empty() {
+        if folder.len() < 4 || app.len() < 4 {
             return false;
         }
         if folder == app {
             return true;
         }
-        let (short, long) = if folder.len() <= app.len() {
-            (folder, app)
-        } else {
-            (app, folder)
-        };
-        short.len() >= 4 && long.starts_with(short) && long.len() <= short.len() * 2
+        folder.len() > app.len()
+            && folder.starts_with(app)
+            && folder.len() - app.len() <= 6
     }
 
     /// DisplayIcon 값을 `<img>`로 렌더 가능한 경로로 정규화한다.

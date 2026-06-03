@@ -14,6 +14,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [target, setTarget] = useState<InstalledApp | null>(null);
+  const [needElevation, setNeedElevation] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   // 가장 최근 refresh만 화면에 반영하기 위한 세대 토큰.
@@ -94,9 +95,24 @@ export default function App() {
       // 언인스톨러는 별도 창에서 진행되므로 잠시 후 목록을 갱신한다.
       window.setTimeout(() => void refresh(), 1500);
     } catch (e) {
-      setToast(`언인스톨러 실행 실패: ${String(e)}`);
+      // 권한 상승이 필요하면(최초 삭제 시) 관리자 재실행을 안내한다.
+      if (String(e).includes("ELEVATION_REQUIRED")) {
+        setNeedElevation(true);
+      } else {
+        setToast(`언인스톨러 실행 실패: ${String(e)}`);
+      }
     }
   }, [refresh]);
+
+  const elevate = useCallback(async () => {
+    try {
+      // 성공 시 백엔드가 관리자 권한으로 재실행하고 현재 인스턴스를 종료한다.
+      await invoke("relaunch_as_admin");
+    } catch (e) {
+      setNeedElevation(false);
+      setToast(`권한 상승 실패: ${String(e)}`);
+    }
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -145,6 +161,31 @@ export default function App() {
           onCancel={() => setTarget(null)}
           onConfirm={() => void handleUninstall(target)}
         />
+      )}
+
+      {needElevation && (
+        <div className="dialog-backdrop" onClick={() => setNeedElevation(false)}>
+          <div
+            className="dialog"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="dialog-title">관리자 권한이 필요합니다</h2>
+            <p className="dialog-body">
+              앱을 삭제하려면 관리자 권한이 필요합니다. 권한을 상승하고 앱을 다시
+              시작할까요? (이번 세션에서 한 번만 요청합니다.)
+            </p>
+            <div className="dialog-actions">
+              <button className="btn btn-ghost" onClick={() => setNeedElevation(false)}>
+                취소
+              </button>
+              <button className="btn btn-accent" onClick={() => void elevate()}>
+                관리자로 다시 시작
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && <div className="toast">{toast}</div>}

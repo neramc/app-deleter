@@ -67,9 +67,13 @@ mod windows_impl {
     use winreg::enums::*;
     use winreg::RegKey;
 
-    // 컴파일 타임에 임베드되는 페이로드(메인 앱 exe + 아이콘).
+    // 컴파일 타임에 임베드되는 페이로드(메인 앱 exe + 제거 마법사 exe + 아이콘).
     static APP_EXE: &[u8] =
         include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/payload/app-deleter.exe"));
+    static UNINSTALLER_EXE: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/payload/app-deleter-uninstaller.exe"
+    ));
     static APP_ICON: &[u8] =
         include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/icon.ico"));
 
@@ -105,13 +109,17 @@ mod windows_impl {
         fs::write(&exe_path, APP_EXE).map_err(|e| format!("앱 파일 쓰기 실패: {e}"))?;
         let icon_path = dir.join("icon.ico");
         fs::write(&icon_path, APP_ICON).map_err(|e| format!("아이콘 쓰기 실패: {e}"))?;
+        // 제거 마법사도 함께 설치한다(제어판 "프로그램 제거"가 이 exe를 호출).
+        let uninstaller_path = dir.join("uninstall.exe");
+        fs::write(&uninstaller_path, UNINSTALLER_EXE)
+            .map_err(|e| format!("제거 마법사 쓰기 실패: {e}"))?;
 
         emit(&window, 3, "바로가기 생성 중…");
         let (start_menu_lnk, desktop_lnk) = shortcut_paths();
         create_shortcuts(&exe_path, &icon_path, &start_menu_lnk, &desktop_lnk)?;
 
         emit(&window, 4, "제거 정보 등록 중…");
-        write_uninstall_entry(&dir, &exe_path, &icon_path, &start_menu_lnk, &desktop_lnk)?;
+        write_uninstall_entry(&dir, &uninstaller_path, &icon_path)?;
 
         emit(&window, 5, "설치 완료");
         Ok(())
@@ -170,14 +178,11 @@ mod windows_impl {
     }
 
     /// 제어판 "프로그램 제거" 목록에 표시될 제거 정보를 HKCU에 기록한다.
-    /// UninstallString은 설치 폴더·바로가기·레지스트리 키를 모두 제거하는
-    /// 자체 완결형 PowerShell 명령이다(NSIS 등 외부 의존 없음).
+    /// UninstallString은 함께 설치한 제거 마법사(uninstall.exe)를 가리킨다.
     fn write_uninstall_entry(
         dir: &Path,
-        _exe: &Path,
+        uninstaller: &Path,
         icon: &Path,
-        start_menu: &Path,
-        desktop: &Path,
     ) -> Result<(), String> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let (key, _) = hkcu
@@ -190,7 +195,7 @@ mod windows_impl {
         };
 
         set("DisplayName", "App Deleter")?;
-        set("DisplayVersion", "0.1.0")?;
+        set("DisplayVersion", env!("CARGO_PKG_VERSION"))?;
         set("Publisher", "neramc")?;
         set("InstallLocation", &dir.display().to_string())?;
         set("DisplayIcon", &icon.display().to_string())?;
@@ -198,18 +203,7 @@ mod windows_impl {
         key.set_value("NoRepair", &1u32).ok();
         key.set_value("EstimatedSize", &((APP_EXE.len() / 1024) as u32)).ok();
 
-        let uninstall = format!(
-            "powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \
-             \"Remove-Item -LiteralPath '{dir}' -Recurse -Force; \
-             Remove-Item -LiteralPath '{sm}' -Force -ErrorAction SilentlyContinue; \
-             Remove-Item -LiteralPath '{dt}' -Force -ErrorAction SilentlyContinue; \
-             Remove-Item -LiteralPath 'HKCU:\\{key}' -Recurse -Force\"",
-            dir = dir.display(),
-            sm = start_menu.display(),
-            dt = desktop.display(),
-            key = UNINSTALL_KEY,
-        );
-        set("UninstallString", &uninstall)?;
+        set("UninstallString", &format!("\"{}\"", uninstaller.display()))?;
         Ok(())
     }
 

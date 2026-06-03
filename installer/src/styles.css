@@ -2,6 +2,7 @@
   --bg: #fdfffc; /* 메인 배경 */
   --accent: #41ead4; /* 버튼/강조 */
   --accent-hover: #34c9b5;
+  --accent-soft: rgba(65, 234, 212, 0.16);
   --on-accent: #053b35;
 
   --surface: #ffffff;
@@ -10,8 +11,8 @@
   --stroke: rgba(0, 0, 0, 0.08);
   --track: rgba(0, 0, 0, 0.06);
 
-  --radius-control: 4px;
-  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-card: 10px;
 
   --font: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: light;
@@ -20,14 +21,12 @@
 * {
   box-sizing: border-box;
 }
-
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
 }
-
 body {
   font-family: var(--font);
   font-size: 14px;
@@ -43,33 +42,41 @@ body {
   height: 100vh;
 }
 
-/* ── Hero ───────────────────────────────────────────── */
+/* ── Drag bar ───────────────────────────────────────── */
+.topbar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.topbar-title {
+  pointer-events: none;
+}
+
+/* ── Hero (gradient accent) ─────────────────────────── */
 .hero {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 28px 32px 20px;
+  padding: 14px 28px 20px;
+  background: linear-gradient(135deg, var(--accent-soft), transparent 70%);
 }
-
 .logo {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
   border-radius: var(--radius-card);
-  background: var(--accent);
+  box-shadow: 0 4px 14px rgba(65, 234, 212, 0.35);
 }
-
 .hero-text h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 25px;
   line-height: 30px;
   font-weight: 700;
+  letter-spacing: -0.2px;
 }
-
 .hero-text p {
   margin: 4px 0 0;
   color: var(--text-secondary);
@@ -79,22 +86,52 @@ body {
 /* ── Body ───────────────────────────────────────────── */
 .body {
   flex: 1;
-  padding: 8px 32px;
+  padding: 4px 28px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-height: 0;
+}
+
+.features {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.tick {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .field-label {
+  display: block;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 6px;
 }
-
 .field {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 12px;
   font: inherit;
   color: var(--text-primary);
   background: var(--surface);
@@ -103,12 +140,10 @@ body {
   outline: none;
   user-select: text;
 }
-
 .field:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(65, 234, 212, 0.25);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
-
 .hint {
   margin-top: 12px;
   font-size: 12px;
@@ -116,9 +151,54 @@ body {
   line-height: 18px;
 }
 
-/* ── Progress ───────────────────────────────────────── */
+/* ── Progress + step checklist ──────────────────────── */
 .progress-wrap {
   width: 100%;
+}
+.steps {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: color 150ms ease;
+}
+.step-dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--track);
+  color: var(--text-secondary);
+  transition: background 150ms ease, color 150ms ease;
+}
+.step.active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.step.active .step-dot {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.step.done {
+  color: var(--text-primary);
+}
+.step.done .step-dot {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .progress-track {
@@ -128,14 +208,12 @@ body {
   border-radius: 999px;
   overflow: hidden;
 }
-
 .progress-fill {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
   border-radius: 999px;
   transition: width 250ms ease-out;
 }
-
 .progress-msg {
   margin-top: 12px;
   font-size: 13px;
@@ -147,43 +225,48 @@ body {
 .result {
   text-align: center;
 }
-
 .result-icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 12px;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
   border-radius: 50%;
+  animation: pop 280ms ease-out;
 }
-
 .result.success .result-icon {
   background: var(--accent);
   color: var(--on-accent);
+  box-shadow: 0 6px 20px rgba(65, 234, 212, 0.4);
 }
-
 .result.error .result-icon {
   background: #ffe3e3;
   color: #c0392b;
 }
-
 .result h2 {
   margin: 0 0 6px;
   font-size: 18px;
 }
-
-.result p {
+.path-line {
   margin: 0;
   color: var(--text-secondary);
+  font-size: 12px;
+  word-break: break-all;
+}
+.error-text {
+  color: #c0392b;
   font-size: 13px;
   word-break: break-all;
 }
 
-.error-text {
-  color: #c0392b !important;
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
 }
 
 /* ── Actions ────────────────────────────────────────── */
@@ -191,43 +274,39 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 16px 32px 24px;
+  padding: 16px 28px 22px;
 }
-
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 88px;
-  padding: 9px 18px;
+  min-width: 92px;
+  padding: 10px 20px;
   font: inherit;
   font-weight: 600;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   cursor: pointer;
-  transition: background 120ms ease-out, opacity 120ms ease-out;
+  transition: background 120ms ease-out, box-shadow 120ms ease-out,
+    opacity 120ms ease-out;
 }
-
 .btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
-
 .btn-accent {
   background: var(--accent);
   color: var(--on-accent);
 }
-
 .btn-accent:not(:disabled):hover {
   background: var(--accent-hover);
+  box-shadow: 0 4px 14px rgba(65, 234, 212, 0.4);
 }
-
 .btn-ghost {
   background: var(--surface);
   color: var(--text-primary);
   border-color: var(--stroke);
 }
-
 .btn-ghost:not(:disabled):hover {
-  background: rgba(65, 234, 212, 0.1);
+  background: var(--accent-soft);
 }

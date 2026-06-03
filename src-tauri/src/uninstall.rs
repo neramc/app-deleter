@@ -1,11 +1,46 @@
+/// 프론트가 권한 상승이 필요함을 식별하기 위한 센티넬 에러 메시지.
+pub const ELEVATION_REQUIRED: &str = "ELEVATION_REQUIRED";
+
+/// 현재 프로세스가 관리자 권한으로 실행 중인지 반환한다.
+#[tauri::command]
+pub fn is_admin() -> bool {
+    #[cfg(windows)]
+    {
+        crate::elevation::is_elevated()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// 현재 앱을 관리자 권한으로 재실행하고 현재 인스턴스를 종료한다(UAC 1회).
+#[tauri::command]
+pub fn relaunch_as_admin(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        crate::elevation::relaunch_as_admin()?;
+        app.exit(0);
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        Err("권한 상승은 Windows에서만 지원됩니다.".into())
+    }
+}
+
 /// 앱의 UninstallString을 실행하여 시스템 언인스톨러를 띄운다.
 ///
-/// 언인스톨러 자체 UI는 OS/설치 프로그램에 위임하므로, 프로세스 종료를
-/// 기다리지 않고 spawn 성공 여부만 반환한다.
+/// 관리자 권한이 없으면 `ELEVATION_REQUIRED`를 반환한다(프론트가 권한 상승을
+/// 안내). 권한이 있으면 추가 프롬프트 없이 언인스톨러를 실행한다.
 #[tauri::command]
 pub fn uninstall_app(uninstall_string: String) -> Result<(), String> {
     #[cfg(windows)]
     {
+        if !crate::elevation::is_elevated() {
+            return Err(ELEVATION_REQUIRED.into());
+        }
         windows_impl::run(&uninstall_string)
     }
     #[cfg(not(windows))]

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import iconUrl from "./assets/icon.png";
 
 interface Progress {
   step: number;
@@ -10,20 +11,32 @@ interface Progress {
 
 type Phase = "idle" | "installing" | "done" | "error";
 
+const FEATURES = [
+  "설치된 앱을 실제 점유 용량 기준으로 정렬",
+  "설치 폴더 + AppData(Local·Roaming) 데이터까지 합산",
+  "버튼 한 번으로 시스템 언인스톨러 실행",
+];
+
+const STEP_LABELS = [
+  "설치 폴더 생성",
+  "앱 파일 복사",
+  "바로가기 생성",
+  "제거 정보 등록",
+  "완료",
+];
+
 export default function App() {
   const [installDir, setInstallDir] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 기본 설치 경로(%LOCALAPPDATA%\AppDeleter, ASCII) 조회.
   useEffect(() => {
     invoke<string>("default_install_dir")
       .then(setInstallDir)
       .catch(() => setInstallDir("C:\\Program Files\\AppDeleter"));
   }, []);
 
-  // 설치 진행 이벤트 구독.
   useEffect(() => {
     const un = listen<Progress>("install-progress", (e) => setProgress(e.payload));
     return () => {
@@ -55,22 +68,36 @@ export default function App() {
   const close = useCallback(() => void invoke("exit_installer"), []);
 
   const pct = progress ? Math.round((progress.step / progress.total) * 100) : 0;
+  const currentStep = progress?.step ?? 0;
 
   return (
     <div className="installer">
+      <div className="topbar" data-tauri-drag-region>
+        <span className="topbar-title">App Deleter 설치</span>
+      </div>
+
       <header className="hero">
-        <div className="logo" aria-hidden>
-          🗑
-        </div>
+        <img className="logo" src={iconUrl} alt="" />
         <div className="hero-text">
           <h1>App Deleter</h1>
-          <p>설치된 앱을 실제 용량 기준으로 정리하는 도구</p>
+          <p>설치된 앱을 똑똑하게 정리하는 데스크톱 도구</p>
         </div>
       </header>
 
       <main className="body">
         {phase === "idle" && (
           <>
+            <ul className="features">
+              {FEATURES.map((f) => (
+                <li key={f}>
+                  <span className="tick" aria-hidden>
+                    ✓
+                  </span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
             <label className="field-label" htmlFor="dir">
               설치 위치
             </label>
@@ -82,14 +109,29 @@ export default function App() {
               spellCheck={false}
             />
             <p className="hint">
-              관리자 권한 없이 현재 사용자 계정에 설치됩니다. 설치 후 시작 메뉴와
-              바탕화면에 바로가기가 생성됩니다.
+              관리자 권한 없이 현재 사용자 계정에 설치되며, 시작 메뉴·바탕화면
+              바로가기와 제어판 제거 항목이 함께 등록됩니다.
             </p>
           </>
         )}
 
         {phase === "installing" && (
           <div className="progress-wrap">
+            <ol className="steps">
+              {STEP_LABELS.map((label, i) => {
+                const n = i + 1;
+                const state =
+                  n < currentStep ? "done" : n === currentStep ? "active" : "todo";
+                return (
+                  <li key={label} className={`step ${state}`}>
+                    <span className="step-dot" aria-hidden>
+                      {state === "done" ? "✓" : n}
+                    </span>
+                    {label}
+                  </li>
+                );
+              })}
+            </ol>
             <div className="progress-track">
               <div className="progress-fill" style={{ width: `${pct}%` }} />
             </div>
@@ -105,7 +147,7 @@ export default function App() {
               ✓
             </div>
             <h2>설치 완료</h2>
-            <p>{installDir} 에 설치되었습니다.</p>
+            <p className="path-line">{installDir}</p>
           </div>
         )}
 

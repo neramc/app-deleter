@@ -1,8 +1,8 @@
 name: release
 
-# 빌드가 시작되면 다음 버전 태그(vX.Y.Z)를 자동 계산·푸시하고,
-# 메인 앱(app-deleter.exe)과 그 앱을 임베드한 커스텀 설치 마법사
-# (App Deleter Setup, NSIS 비의존)를 빌드해 GitHub Release에 업로드한다.
+# 빌드가 시작되면 다음 버전 태그(vX.Y.Z)를 자동 계산하고, 그 버전을 모든
+# 매니페스트(package.json/Cargo.toml/tauri.conf.json)에 반영해 커밋·태그한 뒤,
+# 메인 앱 / 제거 마법사 / 설치 마법사를 빌드해 GitHub Release에 업로드한다.
 on:
   push:
     tags:
@@ -21,6 +21,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # 코드 서명용(선택). 저장소 Secrets에 설정하면 SmartScreen 완화를 위해 서명한다.
+  WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+  WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -31,16 +36,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine and push next version tag
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ./src-tauri -> target
+            ./installer/src-tauri -> target
+            ./uninstaller/src-tauri -> target
+
+      - name: Determine version, sync manifests, push tag
         id: version
         shell: bash
         run: |
           set -euo pipefail
+          # 태그 푸시로 트리거된 경우: 그 태그를 그대로 사용(버전 동기화/커밋 없음).
           if [ "${{ github.ref_type }}" = "tag" ]; then
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "푸시된 태그 사용: ${{ github.ref_name }}"
             exit 0
           fi
+
           git fetch --tags --quiet || true
           latest=$(git tag -l 'v*' --sort=-v:refname | head -n1 || true)
           if [ -z "$latest" ]; then
@@ -59,52 +84,51 @@ jobs:
           while git rev-parse "$next" >/dev/null 2>&1; do
             patch=$((patch+1)); next="v${major}.${minor}.${patch}"
           done
-          echo "다음 버전 태그: $next"
+          echo "다음 버전: $next"
+
+          # 모든 매니페스트의 버전을 동기화하고 커밋·태그·푸시한다.
+          node scripts/set-version.mjs "${next#v}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): $next" || echo "변경 사항 없음"
+          git push origin HEAD:main
           git tag "$next"
           git push origin "$next"
           echo "tag=$next" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Cache cargo
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            ./src-tauri -> target
-            ./installer/src-tauri -> target
-
-      # ── 1) 메인 앱(app-deleter.exe) 빌드 ───────────────────────────
+      # ── 1) 메인 앱 빌드 ──────────────────────────────────────────
       - name: Build main app
         run: |
-          npm ci
+          npm install
           npm run tauri build -- --no-bundle --target x86_64-pc-windows-msvc
 
-      # ── 2) 설치 마법사가 임베드할 페이로드로 메인 exe 복사 ───────────
+      # ── 2) 제거 마법사 빌드 ─────────────────────────────────────
+      - name: Build uninstaller
+        working-directory: uninstaller
+        run: |
+          npm install
+          npm run tauri build -- --no-bundle --target x86_64-pc-windows-msvc
+
+      # ── 3) 설치 마법사가 임베드할 페이로드 준비 ──────────────────
       - name: Stage payload for installer
         shell: bash
         run: |
           mkdir -p installer/src-tauri/payload
           cp src-tauri/target/x86_64-pc-windows-msvc/release/app-deleter.exe \
              installer/src-tauri/payload/app-deleter.exe
+          cp uninstaller/src-tauri/target/x86_64-pc-windows-msvc/release/app-deleter-uninstaller.exe \
+             installer/src-tauri/payload/app-deleter-uninstaller.exe
 
-      # ── 3) 커스텀 설치 마법사 빌드 ────────────────────────────────
+      # ── 4) 설치 마법사 빌드 ─────────────────────────────────────
       - name: Build installer
         working-directory: installer
         run: |
-          npm ci
+          npm install
           npm run tauri build -- --no-bundle --target x86_64-pc-windows-msvc
 
-      # ── 4) 산출물을 ASCII 이름으로 정리 ───────────────────────────
+      # ── 5) 산출물을 ASCII 이름으로 정리 ─────────────────────────
       - name: Collect artifacts
-        id: artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -116,7 +140,21 @@ jobs:
              "out/AppDeleter-${tag}.exe"
           ls -la out
 
-      # ── 5) 릴리스 생성 및 업로드 ──────────────────────────────────
+      # ── 6) (선택) 코드 서명 — Secrets가 있을 때만 ────────────────
+      - name: Code sign (optional)
+        if: ${{ env.WINDOWS_CERT_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          Get-ChildItem out\*.exe | ForEach-Object {
+            & $signtool sign /f $pfx /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 `
+              /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+          }
+
+      # ── 7) 릴리스 생성 및 업로드 ────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -125,8 +163,10 @@ jobs:
           body: |
             자동 빌드된 Windows 산출물입니다.
 
-            - **AppDeleter-Setup-${{ steps.version.outputs.tag }}.exe** — 커스텀 설치 마법사(권장). 실행 후 설치하면 시작 메뉴·바탕화면 바로가기와 제거 정보가 등록됩니다.
+            - **AppDeleter-Setup-${{ steps.version.outputs.tag }}.exe** — 커스텀 설치 마법사(권장). 설치 시 제거 마법사도 함께 설치되어 제어판에서 깔끔하게 제거할 수 있습니다.
             - **AppDeleter-${{ steps.version.outputs.tag }}.exe** — 설치 없이 바로 실행하는 단독 실행 파일.
+
+            > 코드 서명 인증서가 없으면 첫 실행 시 Windows SmartScreen 경고가 나타날 수 있습니다(추가 정보 → 실행).
           draft: false
           prerelease: false
           files: |
