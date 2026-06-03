@@ -1,6 +1,6 @@
 {
   "name": "app-deleter-uninstaller",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "App Deleter 제거 마법사 (Tauri + React)",
   "type": "module",
   "scripts": {

@@ -1,6 +1,6 @@
 [package]
 name = "app-deleter"
-version = "0.1.0"
+version = "1.1.0"
 description = "Windows 앱 삭제 애플리케이션"
 authors = ["app-deleter"]
 edition = "2021"

@@ -1,6 +1,6 @@
 {
   "name": "app-deleter",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "Windows 앱 삭제 애플리케이션 — 설치된 앱을 실제 전체 용량 기준으로 정렬하고 언인스톨러를 실행",
   "type": "module",
   "scripts": {

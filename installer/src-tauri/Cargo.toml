@@ -1,6 +1,6 @@
 [package]
 name = "app-deleter-installer"
-version = "0.1.0"
+version = "1.1.0"
 description = "App Deleter 설치 마법사"
 authors = ["neramc"]
 edition = "2021"

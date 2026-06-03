@@ -1,6 +1,6 @@
 {
   "name": "app-deleter-installer",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "App Deleter 커스텀 설치 마법사 (NSIS 비의존, Tauri + React)",
   "type": "module",
   "scripts": {
