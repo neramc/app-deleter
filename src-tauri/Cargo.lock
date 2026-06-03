@@ -56,7 +56,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
- "walkdir",
+ "windows",
  "winreg 0.52.0",
 ]
 

@@ -14,7 +14,13 @@ Windows에서 설치된 앱을 **실제 전체 데이터 용량 기준으로 정
 ## 주요 기능
 
 - HKLM/HKCU 레지스트리의 Uninstall 항목을 열거(32/64비트 모두)하고 시스템 컴포넌트·업데이트 항목을 필터링
-- 설치 폴더(`InstallLocation`)를 `walkdir` + `rayon`으로 병렬 재귀 순회하여 **실제 전체 용량** 계산
+- **설치 폴더 + AppData 데이터까지 합산**하여 앱의 실제 점유 용량 계산:
+  - 설치 폴더(`InstallLocation`)
+  - `%APPDATA%`(Roaming) · `%LOCALAPPDATA%`(Local) · `LocalLow` · `%ProgramData%` 내
+    해당 앱의 데이터 폴더(이름 매칭). 서로 포함 관계인 경로는 중복 합산하지 않음
+- **고성능 폴더 스캐너**(`src-tauri/src/fastsize.rs`): Win32 `FindFirstFileExW` +
+  `FindExInfoBasic`(8.3 단축명 생략) + `FIND_FIRST_EX_LARGE_FETCH`(배치 읽기)로
+  추가 stat 호출 없이 크기를 취득하고, 최상위 하위 폴더를 `rayon`으로 병렬 스캔
 - 용량은 백그라운드에서 계산되며 `app-size-updated` 이벤트로 스트리밍 → 즉시 목록 표시 후 점진적 갱신/재정렬
 - **용량 큰 순 기본 정렬**, 이름/게시자 검색, 새로고침
 - 삭제 버튼 → 확인 후 `UninstallString`을 파싱해 OS 언인스톨러 실행

@@ -47,6 +47,7 @@ pub fn list_installed_apps(
 #[cfg(windows)]
 mod windows_impl {
     use super::{AppSizeUpdate, InstalledApp};
+    use crate::fastsize;
     use std::collections::HashMap;
     use std::path::{Path, PathBuf};
     use tauri::Emitter;
@@ -154,19 +155,23 @@ mod windows_impl {
         })
     }
 
-    /// 실제 폴더 용량을 병렬 계산하고 앱별로 이벤트를 emit한다.
-    fn spawn_size_calculation(app: tauri::AppHandle, apps: &[InstalledApp]) {
-        struct Job {
-            id: String,
-            install_location: Option<String>,
-            icon_dir: Option<String>,
-            fallback_bytes: u64,
-        }
+    /// 한 앱의 용량을 계산하는 데 필요한 정보.
+    struct Job {
+        id: String,
+        name_norm: String,
+        install_location: Option<String>,
+        icon_dir: Option<String>,
+        fallback_bytes: u64,
+    }
 
+    /// 실제 폴더 용량(설치 폴더 + AppData 데이터)을 병렬 계산하고
+    /// 앱별로 `app-size-updated` 이벤트를 emit한다.
+    fn spawn_size_calculation(app: tauri::AppHandle, apps: &[InstalledApp]) {
         let jobs: Vec<Job> = apps
             .iter()
             .map(|a| Job {
                 id: a.id.clone(),
+                name_norm: normalize(&a.name),
                 install_location: a.install_location.clone(),
                 icon_dir: a
                     .icon_path
@@ -180,11 +185,17 @@ mod windows_impl {
         std::thread::spawn(move || {
             use rayon::prelude::*;
 
+            // AppData(Roaming/Local/LocalLow/ProgramData) 하위 폴더를 한 번만
+            // 인덱싱해 두고, 각 앱은 이 인덱스에서 자신의 데이터 폴더를 매칭한다.
+            let index = AppDataIndex::build();
+
             jobs.par_iter().for_each(|job| {
-                let (size_bytes, size_estimated) = measure(job.install_location.as_deref())
-                    .or_else(|| measure(job.icon_dir.as_deref()))
-                    .map(|bytes| (bytes, false))
-                    .unwrap_or((job.fallback_bytes, true));
+                let roots = collect_roots(job, &index);
+                let (size_bytes, size_estimated) = if roots.is_empty() {
+                    (job.fallback_bytes, true)
+                } else {
+                    (roots.iter().map(|r| fastsize::dir_size(r)).sum(), false)
+                };
 
                 let _ = app.emit(
                     "app-size-updated",
@@ -200,27 +211,148 @@ mod windows_impl {
         });
     }
 
-    /// 경로가 실재하는 디렉터리면 재귀 용량을 계산한다(없으면 None).
-    fn measure(path: Option<&str>) -> Option<u64> {
-        let path = PathBuf::from(path?);
-        if !path.is_dir() {
-            return None;
+    /// 한 앱에 대해 용량을 합산할 실제 디렉터리 목록을 구성한다.
+    /// 설치 폴더(없으면 아이콘 폴더 폴백) + 매칭된 AppData 데이터 폴더들.
+    /// 서로 포함 관계인 루트는 제거해 이중 합산을 방지한다.
+    fn collect_roots(job: &Job, index: &AppDataIndex) -> Vec<PathBuf> {
+        let mut roots: Vec<PathBuf> = Vec::new();
+
+        let install = job
+            .install_location
+            .as_deref()
+            .map(PathBuf::from)
+            .filter(|p| p.is_dir());
+        if let Some(p) = install {
+            roots.push(p);
+        } else if let Some(icd) = job.icon_dir.as_deref() {
+            let p = PathBuf::from(icd);
+            if p.is_dir() {
+                roots.push(p);
+            }
         }
-        Some(dir_size(&path))
+
+        roots.extend(index.matches(&job.name_norm));
+        dedupe_roots(roots)
     }
 
-    /// 디렉터리를 재귀 순회하여 모든 파일 크기를 합산한다.
-    /// - 심볼릭/리파스 포인트는 따라가지 않음(루프/중복 방지)
-    /// - 접근 거부 항목은 건너뜀
-    fn dir_size(path: &Path) -> u64 {
-        walkdir::WalkDir::new(path)
-            .follow_links(false)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter_map(|e| e.metadata().ok())
-            .filter(|m| m.is_file())
-            .map(|m| m.len())
-            .sum()
+    /// 다른 루트의 하위 경로인 루트를 제거(대소문자 무시)해 중복 합산을 막는다.
+    fn dedupe_roots(mut roots: Vec<PathBuf>) -> Vec<PathBuf> {
+        roots.sort_by_key(|p| p.as_os_str().len());
+        let mut kept: Vec<PathBuf> = Vec::new();
+        for r in roots {
+            let rl = r.to_string_lossy().to_lowercase();
+            let is_sub = kept.iter().any(|k| {
+                let kl = k.to_string_lossy().to_lowercase();
+                rl == kl || rl.starts_with(&(kl + "\\"))
+            });
+            if !is_sub {
+                kept.push(r);
+            }
+        }
+        kept
+    }
+
+    /// 문자열을 소문자 영숫자만 남겨 정규화한다("Visual Studio Code" → "visualstudiocode").
+    fn normalize(s: &str) -> String {
+        s.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(|c| c.to_lowercase())
+            .collect()
+    }
+
+    /// AppData 데이터 폴더 인덱스: (정규화된 폴더명, 전체 경로).
+    /// 각 루트의 1~2단계 하위 폴더를 한 번만 수집한다(앱마다 재탐색하지 않음).
+    struct AppDataIndex {
+        entries: Vec<(String, PathBuf)>,
+    }
+
+    impl AppDataIndex {
+        fn build() -> Self {
+            let mut entries = Vec::new();
+            for root in Self::roots() {
+                Self::index_two_levels(&root, &mut entries);
+            }
+            AppDataIndex { entries }
+        }
+
+        /// 검색 대상 AppData 루트들.
+        fn roots() -> Vec<PathBuf> {
+            let mut v = Vec::new();
+            if let Ok(p) = std::env::var("APPDATA") {
+                v.push(PathBuf::from(p)); // Roaming
+            }
+            if let Ok(p) = std::env::var("LOCALAPPDATA") {
+                let local = PathBuf::from(&p);
+                if let Some(parent) = local.parent() {
+                    v.push(parent.join("LocalLow"));
+                }
+                v.push(local); // Local
+            }
+            if let Ok(p) = std::env::var("ProgramData") {
+                v.push(PathBuf::from(p));
+            }
+            v
+        }
+
+        /// 루트의 직속 폴더 + 그 한 단계 하위 폴더(예: Roaming\Publisher\App)를 인덱싱.
+        fn index_two_levels(root: &Path, out: &mut Vec<(String, PathBuf)>) {
+            let Ok(rd) = std::fs::read_dir(root) else {
+                return;
+            };
+            for e in rd.flatten() {
+                let Ok(ft) = e.file_type() else { continue };
+                if !ft.is_dir() || ft.is_symlink() {
+                    continue;
+                }
+                let path = e.path();
+                out.push((normalize(&e.file_name().to_string_lossy()), path.clone()));
+
+                if let Ok(rd2) = std::fs::read_dir(&path) {
+                    for e2 in rd2.flatten() {
+                        if e2
+                            .file_type()
+                            .map(|t| t.is_dir() && !t.is_symlink())
+                            .unwrap_or(false)
+                        {
+                            out.push((
+                                normalize(&e2.file_name().to_string_lossy()),
+                                e2.path(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        /// 앱 이름(정규화)과 강하게 일치하는 데이터 폴더 경로들을 반환한다.
+        fn matches(&self, app_norm: &str) -> Vec<PathBuf> {
+            if app_norm.len() < 4 {
+                return Vec::new(); // 너무 짧은 이름은 오탐 위험이 커서 제외
+            }
+            self.entries
+                .iter()
+                .filter(|(folder, _)| strong_match(folder, app_norm))
+                .map(|(_, p)| p.clone())
+                .collect()
+        }
+    }
+
+    /// 폴더명과 앱 이름의 강한 일치 판정(오탐 최소화):
+    /// 완전 일치, 또는 짧은 쪽이 4자 이상이면서 긴 쪽의 접두사이고
+    /// 길이 차가 2배를 넘지 않는 경우만 매칭으로 본다.
+    fn strong_match(folder: &str, app: &str) -> bool {
+        if folder.is_empty() || app.is_empty() {
+            return false;
+        }
+        if folder == app {
+            return true;
+        }
+        let (short, long) = if folder.len() <= app.len() {
+            (folder, app)
+        } else {
+            (app, folder)
+        };
+        short.len() >= 4 && long.starts_with(short) && long.len() <= short.len() * 2
     }
 
     /// DisplayIcon 값을 `<img>`로 렌더 가능한 경로로 정규화한다.

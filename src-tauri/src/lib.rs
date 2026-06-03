@@ -1,4 +1,6 @@
 mod apps;
+#[cfg(windows)]
+mod fastsize;
 mod uninstall;
 
 pub use apps::{list_installed_apps, InstalledApp};
