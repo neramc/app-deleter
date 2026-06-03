@@ -25,7 +25,7 @@ Windows에서 설치된 앱을 **실제 전체 데이터 용량 기준으로 정
 ```bash
 npm install
 npm run tauri dev      # 개발 모드 (Windows에서 실행)
-npm run tauri build    # 로컬 번들(NSIS .exe / MSI) 생성
+npm run tauri build    # 로컬 번들(NSIS .exe) 생성
 ```
 
 > Tauri 앱의 실제 동작은 Windows에서만 완전합니다. 비-Windows에서는
@@ -34,7 +34,7 @@ npm run tauri build    # 로컬 번들(NSIS .exe / MSI) 생성
 ## 릴리스 (자동 빌드)
 
 `v*` 형식의 태그를 푸시하면 GitHub Actions(`.github/workflows/release.yml`)가
-`windows-latest`에서 빌드하여 NSIS/MSI 산출물을 **GitHub Release에 자동 업로드**합니다.
+`windows-latest`에서 빌드하여 NSIS 산출물을 **GitHub Release에 자동 업로드**합니다.
 
 ```bash
 git tag v0.1.0

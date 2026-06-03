@@ -46,7 +46,7 @@ jobs:
           # 태그 푸시면 그 태그를, 수동 실행이면 app-v<version>을 사용.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('app-v{0}', github.run_number) }}
           releaseName: "앱 삭제 ${{ github.ref_type == 'tag' && github.ref_name || github.run_number }}"
-          releaseBody: "자동 빌드된 Windows 설치 파일(NSIS .exe / MSI)입니다."
+          releaseBody: "자동 빌드된 Windows 설치 파일(NSIS .exe)입니다."
           releaseDraft: false
           prerelease: false
           args: --target x86_64-pc-windows-msvc
