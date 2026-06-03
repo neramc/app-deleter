@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "메인 창에 부여하는 기본 권한(코어 이벤트/창/경로 등).",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

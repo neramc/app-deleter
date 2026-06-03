@@ -1,0 +1,417 @@
+:root {
+  /* 사용자 지정 색상 */
+  --bg: #fdfffc; /* 메인 배경 */
+  --accent: #41ead4; /* 버튼/강조 */
+  --accent-hover: #34c9b5; /* hover/pressed */
+  --on-accent: #053b35; /* accent 위 텍스트(대비 확보) */
+
+  /* 파생 중립 팔레트 */
+  --surface: #ffffff;
+  --text-primary: #1a1d1c;
+  --text-secondary: #5b6260;
+  --stroke: rgba(0, 0, 0, 0.08);
+  --row-hover: rgba(65, 234, 212, 0.1);
+  --track: rgba(0, 0, 0, 0.06);
+
+  /* DESIGN.md 참고: 4px 그리드 · 컨트롤 4px / 카드 8px */
+  --radius-control: 4px;
+  --radius-card: 8px;
+  --gap: 8px;
+
+  --font: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-primary);
+  background: var(--bg);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.app-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.app-title-icon {
+  font-size: 20px;
+}
+
+.app-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.app-summary-dot {
+  margin: 0 6px;
+  opacity: 0.5;
+}
+
+.app-summary-calc {
+  color: var(--accent-hover);
+}
+
+/* ── Toolbar ────────────────────────────────────────── */
+.toolbar {
+  position: sticky;
+  top: 57px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.search {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 13px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 7px 12px 7px 30px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--row-hover);
+}
+
+.sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sort-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sort-select {
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+}
+
+/* ── Buttons ────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition:
+    background 120ms ease-out,
+    box-shadow 120ms ease-out,
+    opacity 120ms ease-out;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-accent:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--stroke);
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: var(--row-hover);
+}
+
+.btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  outline: none;
+}
+
+/* ── App list ───────────────────────────────────────── */
+.app-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 24px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  transition: background 120ms ease-out;
+}
+
+.row:hover {
+  background: var(--row-hover);
+}
+
+.row-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  overflow: hidden;
+}
+
+.row-icon img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.row-icon-fallback {
+  font-size: 20px;
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-version {
+  opacity: 0.8;
+}
+
+.size-bar {
+  margin-top: 6px;
+  height: 4px;
+  width: 100%;
+  background: var(--track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.size-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 200ms ease-out;
+}
+
+.row-size {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
+  min-width: 72px;
+}
+
+.approx {
+  color: var(--text-secondary);
+  margin-right: 1px;
+}
+
+/* ── Empty / skeleton ───────────────────────────────── */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  gap: 8px;
+}
+
+.empty-icon {
+  font-size: 40px;
+}
+
+.skeleton {
+  pointer-events: none;
+}
+
+.skeleton-block {
+  height: 44px;
+  width: 100%;
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    90deg,
+    var(--track) 25%,
+    rgba(0, 0, 0, 0.03) 37%,
+    var(--track) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+.spin {
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Dialog ─────────────────────────────────────────── */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4); /* Smoke */
+  animation: fade 150ms ease-out;
+}
+
+.dialog {
+  width: min(420px, calc(100vw - 40px));
+  padding: 20px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+  animation: pop 200ms ease-out;
+}
+
+.dialog-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.dialog-body {
+  margin: 0 0 20px;
+  color: var(--text-secondary);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* ── Toast ──────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 10px 16px;
+  background: var(--text-primary);
+  color: var(--bg);
+  border-radius: var(--radius-control);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+  font-size: 13px;
+  animation: fade 150ms ease-out;
+}
