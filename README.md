@@ -95,11 +95,3 @@ GitHub Actions(`.github/workflows/release.yml`)가 `windows-latest`에서
 
 `Cargo.lock` / `package-lock.json`은 혼동 방지를 위해 **저장소에 올리지 않으며**(.gitignore),
 CI는 `npm install`로 매번 의존성을 해석합니다.
-
-## 아이콘
-
-`app-icon.png`(1024×1024)가 소스 아이콘입니다. 아이콘 세트를 다시 생성하려면:
-
-```bash
-npx tauri icon app-icon.png
-```
