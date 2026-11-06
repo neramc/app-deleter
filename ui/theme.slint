@@ -1,0 +1,103 @@
+// Windows 11 Fluent 디자인 토큰 (DESIGN.md 기준).
+//
+// - 색은 WinUI 테마 리소스 키의 역할 이름을 그대로 따른다(Light/Dark 모두 정의).
+//   Slint 색 표기는 #RRGGBBAA 이므로 WinUI의 #AARRGGBB 값을 변환해 적었다.
+// - 강조색은 Slint가 OS 시스템 강조색으로 보정한 Palette.accent-background를 쓴다.
+// - 창 배경 재질(Mica)은 Slint 렌더러가 창 투명 합성을 지원하지 않으므로
+//   SolidBackgroundFillColorBase 솔리드 색으로 대체한다(Windows 11 전용 앱의 의도된 폴백).
+
+import { Palette } from "std-widgets.slint";
+
+export global Theme {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+
+    // ── 배경 · 표면 ────────────────────────────────────────────
+    // SolidBackgroundFillColorBase
+    out property <brush> window-background: dark ? #202020 : #f3f3f3;
+    // CardBackgroundFillColorDefault / Secondary
+    out property <brush> card-background: dark ? #ffffff0d : #ffffffb3;
+    out property <brush> card-background-secondary: dark ? #ffffff08 : #f6f6f680;
+    // CardStrokeColorDefault
+    out property <brush> card-stroke: dark ? #00000019 : #0000000f;
+    // 다이얼로그(ContentDialog) 본문/하단 영역 — SolidBackgroundFillColorBase / Secondary 계열
+    out property <brush> dialog-background: dark ? #2b2b2b : #ffffff;
+    out property <brush> dialog-footer: dark ? #202020 : #f3f3f3;
+    // SurfaceStrokeColorDefault
+    out property <brush> surface-stroke: dark ? #75757566 : #75757566;
+    // DividerStrokeColorDefault
+    out property <brush> divider: dark ? #ffffff15 : #0000000f;
+    // SmokeFillColorDefault (모달 뒤 배경)
+    out property <brush> smoke: #0000004d;
+
+    // ── 미묘한 채움(호버/눌림) ────────────────────────────────
+    // SubtleFillColorSecondary / Tertiary
+    out property <brush> subtle-hover: dark ? #ffffff0f : #00000009;
+    out property <brush> subtle-pressed: dark ? #ffffff0a : #00000006;
+    // ControlStrongStrokeColorDefault
+    out property <brush> control-strong-stroke: dark ? #ffffff8b : #00000072;
+    // ControlFillColorDefault
+    out property <brush> control-fill: dark ? #ffffff0f : #ffffffb3;
+
+    // ── 텍스트 ────────────────────────────────────────────────
+    // TextFillColorPrimary / Secondary / Tertiary
+    out property <brush> text-primary: dark ? #ffffff : #000000e4;
+    out property <brush> text-secondary: dark ? #ffffffc5 : #0000009e;
+    out property <brush> text-tertiary: dark ? #ffffff87 : #00000072;
+
+    // ── 강조색(OS 강조색 반영) ────────────────────────────────
+    out property <brush> accent: Palette.accent-background;
+    out property <brush> on-accent: Palette.accent-foreground;
+    // AccentTextFillColorPrimary 근사
+    out property <brush> accent-text: Palette.accent-background;
+
+    // ── 시스템 의미색 ─────────────────────────────────────────
+    out property <brush> success: dark ? #6ccb5f : #0f7b0f;
+    out property <brush> success-background: dark ? #393d1b : #dff6dd;
+    out property <brush> caution: dark ? #fce100 : #9d5d00;
+    out property <brush> caution-background: dark ? #433519 : #fff4ce;
+    out property <brush> critical: dark ? #ff99a4 : #c42b1c;
+    out property <brush> critical-background: dark ? #442726 : #fde7e9;
+    out property <brush> attention-background: dark ? #ffffff08 : #f6f6f680;
+    out property <brush> neutral-badge: dark ? #ffffff14 : #0000000a;
+
+    // ── 모서리 · 간격(4px 그리드) ─────────────────────────────
+    out property <length> radius-control: 4px;
+    out property <length> radius-overlay: 8px;
+    out property <length> page-padding: 32px;
+
+    // ── 타이포그래피(Segoe UI Variable type ramp) ─────────────
+    out property <length> caption: 12px;
+    out property <length> body: 14px;
+    out property <length> body-large: 18px;
+    out property <length> subtitle: 20px;
+    out property <length> title: 28px;
+    out property <int> semibold: 600;
+    out property <int> regular: 400;
+
+    // Windows 11 기본 아이콘 글꼴(시스템에 설치되어 있으며 앱에 동봉하지 않는다).
+    out property <string> icon-font: "Segoe Fluent Icons";
+}
+
+// Segoe Fluent Icons 코드 포인트.
+export global Icons {
+    out property <string> delete: "\u{E74D}";
+    out property <string> refresh: "\u{E72C}";
+    out property <string> search: "\u{E721}";
+    out property <string> folder: "\u{E8B7}";
+    out property <string> folder-open: "\u{E838}";
+    out property <string> document: "\u{E8A5}";
+    out property <string> link: "\u{E71B}";
+    out property <string> registry: "\u{E8D7}";
+    out property <string> list: "\u{EA37}";
+    out property <string> service: "\u{E713}";
+    out property <string> task: "\u{E823}";
+    out property <string> app: "\u{ECAA}";
+    out property <string> store: "\u{E719}";
+    out property <string> info: "\u{E946}";
+    out property <string> warning: "\u{E7BA}";
+    out property <string> error: "\u{EA39}";
+    out property <string> success: "\u{E930}";
+    out property <string> shield: "\u{EA18}";
+    out property <string> broom: "\u{EA99}";
+    out property <string> close: "\u{E711}";
+}

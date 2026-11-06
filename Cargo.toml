@@ -1,0 +1,65 @@
+[package]
+name = "app-deleter"
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Windows 11 전용 고성능 앱 완전 삭제 도구 (Rust + Slint)"
+license = "Apache-2.0"
+publish = false
+build = "build.rs"
+
+[[bin]]
+name = "app-deleter"
+path = "src/main.rs"
+
+[target.'cfg(windows)'.dependencies]
+slint = { version = "1.18", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "accessibility",
+    "backend-winit",
+    "renderer-skia",
+    "renderer-software",
+] }
+rayon = "1.11"
+image = { version = "0.25", default-features = false, features = ["png"] }
+winreg = "0.56"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Environment",
+    "Win32_System_JobObjects",
+    "Win32_System_Registry",
+    "Win32_System_Restore",
+    "Win32_System_Services",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+    "ApplicationModel",
+    "Foundation",
+    "Foundation_Collections",
+    "Management_Deployment",
+    "System",
+] }
+
+[build-dependencies]
+slint-build = "1.18"
+embed-resource = "3"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev.package."*"]
+opt-level = 2
