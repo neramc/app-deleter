@@ -147,7 +147,7 @@ fn extracts_icons_from_system_binaries() {
     assert_eq!((img.width, img.height), (32, 32));
     assert_eq!(img.pixels.len(), 32 * 32 * 4);
     assert!(
-        img.pixels.chunks_exact(4).any(|p| p[3] > 0),
+        img.pixels.as_chunks::<4>().0.iter().any(|p| p[3] > 0),
         "완전히 투명한 아이콘"
     );
 }

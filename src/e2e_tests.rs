@@ -171,8 +171,10 @@ fn fake_app_is_found_and_removed_completely() {
     let backup = summary.backup_dir.expect("백업 폴더");
     let reg_bytes = std::fs::read(join(&backup, "registry.reg")).expect("registry.reg");
     let words: Vec<u16> = reg_bytes[2..]
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .collect();
     let reg_text = String::from_utf16_lossy(&words);
     assert!(reg_text.starts_with("Windows Registry Editor Version 5.00"));

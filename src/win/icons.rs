@@ -139,20 +139,29 @@ unsafe fn hicon_to_rgba(icon: HICON) -> Option<RgbaImage> {
         // SAFETY: 유효한 DC와 비트맵.
         let mut px = unsafe { bitmap_pixels(dc, color, w, h) };
         if let Some(buf) = px.as_mut() {
-            let has_alpha = buf.chunks_exact(4).any(|p| p[3] != 0);
+            let has_alpha = buf.as_chunks::<4>().0.iter().any(|p| p[3] != 0);
             if !has_alpha {
                 // 알파 없는 구형 아이콘: AND 마스크(흰색=투명)로 알파를 만든다.
                 // SAFETY: 유효한 DC와 마스크 비트맵.
                 match unsafe { bitmap_pixels(dc, mask, w, h) } {
                     Some(m) => {
-                        for (p, mk) in buf.chunks_exact_mut(4).zip(m.chunks_exact(4)) {
+                        for (p, mk) in buf
+                            .as_chunks_mut::<4>()
+                            .0
+                            .iter_mut()
+                            .zip(m.as_chunks::<4>().0)
+                        {
                             p[3] = if mk[0] == 0 { 255 } else { 0 };
                         }
                     }
-                    None => buf.chunks_exact_mut(4).for_each(|p| p[3] = 255),
+                    None => buf
+                        .as_chunks_mut::<4>()
+                        .0
+                        .iter_mut()
+                        .for_each(|p| p[3] = 255),
                 }
             }
-            for p in buf.chunks_exact_mut(4) {
+            for p in buf.as_chunks_mut::<4>().0 {
                 p.swap(0, 2); // BGRA → RGBA
             }
         }
