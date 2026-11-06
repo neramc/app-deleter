@@ -1,0 +1,206 @@
+// 공용 Fluent 스타일 컴포넌트.
+
+import { Button } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+
+// Segoe Fluent Icons 글리프.
+export component Glyph inherits Text {
+    in property <string> glyph;
+    text: glyph;
+    font-family: Theme.icon-font;
+    font-size: 16px;
+    color: Theme.text-primary;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    accessible-role: none;
+}
+
+// 작은 상태 배지(확실/높음/낮음, Store 등).
+export component Badge inherits Rectangle {
+    in property <string> text;
+    // 0 중립, 1 성공, 2 강조, 3 주의, 4 위험
+    in property <int> tone;
+    border-radius: 10px;
+    height: 20px;
+    background: tone == 1 ? Theme.success-background
+        : tone == 2 ? Theme.attention-background
+        : tone == 3 ? Theme.caution-background
+        : tone == 4 ? Theme.critical-background
+        : Theme.neutral-badge;
+    border-width: tone == 2 ? 1px : 0px;
+    border-color: Theme.accent;
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+            text: root.text;
+            font-size: Theme.caption;
+            font-weight: Theme.semibold;
+            vertical-alignment: center;
+            color: tone == 1 ? Theme.success
+                : tone == 2 ? Theme.accent-text
+                : tone == 3 ? Theme.caution
+                : tone == 4 ? Theme.critical
+                : Theme.text-secondary;
+        }
+    }
+}
+
+// Fluent 체크 상자(목록 행에서 모델 값과 단방향 바인딩하기 위한 경량 버전).
+export component FluentCheck inherits Rectangle {
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled();
+    width: 20px;
+    height: 20px;
+    border-radius: Theme.radius-control;
+    background: checked ? (touch.has-hover ? Theme.accent.darker(0.1) : Theme.accent)
+        : (touch.has-hover ? Theme.subtle-hover : Theme.control-fill);
+    border-width: checked ? 0px : 1px;
+    border-color: Theme.control-strong-stroke;
+    opacity: enabled ? 1.0 : 0.4;
+    accessible-role: checkbox;
+    accessible-checkable: true;
+    accessible-checked: checked;
+    accessible-action-default => { touch.clicked(); }
+    animate background { duration: 120ms; easing: ease-out; }
+
+    if checked: Path {
+        width: 12px;
+        height: 12px;
+        commands: "M 1 6.5 L 4.5 10 L 11 2";
+        stroke: Theme.on-accent;
+        stroke-width: 1.8px;
+        fill: transparent;
+        viewbox-width: 12;
+        viewbox-height: 12;
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.toggled(); }
+    }
+}
+
+// 정보 표시줄(InfoBar).
+export component InfoBar inherits Rectangle {
+    in property <string> title;
+    in property <string> message;
+    // 1 정보, 2 주의, 3 위험, 4 성공
+    in property <int> level: 1;
+    in property <string> action-text;
+    callback action();
+    border-radius: Theme.radius-control;
+    border-width: 1px;
+    border-color: Theme.card-stroke;
+    background: level == 2 ? Theme.caution-background
+        : level == 3 ? Theme.critical-background
+        : level == 4 ? Theme.success-background
+        : Theme.attention-background;
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 12px;
+        Glyph {
+            glyph: level == 2 ? Icons.warning : level == 3 ? Icons.error : level == 4 ? Icons.success : Icons.info;
+            color: level == 2 ? Theme.caution : level == 3 ? Theme.critical : level == 4 ? Theme.success : Theme.accent;
+            vertical-alignment: top;
+            width: 20px;
+        }
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+            alignment: center;
+            if root.title != "": Text {
+                text: root.title;
+                font-weight: Theme.semibold;
+                color: Theme.text-primary;
+                wrap: word-wrap;
+            }
+            if root.message != "": Text {
+                text: root.message;
+                color: Theme.text-primary;
+                wrap: word-wrap;
+            }
+        }
+        if root.action-text != "": Button {
+            text: root.action-text;
+            clicked => { root.action(); }
+        }
+    }
+}
+
+// 아이콘 이미지가 없을 때 쓰는 기본 앱 타일.
+export component AppIcon inherits Rectangle {
+    in property <image> icon;
+    in property <bool> has-icon;
+    in property <bool> is-store;
+    in property <length> size: 32px;
+    width: size;
+    height: size;
+    if has-icon: Image {
+        width: root.size;
+        height: root.size;
+        source: root.icon;
+        image-fit: contain;
+        image-rendering: smooth;
+    }
+    if !has-icon: Rectangle {
+        border-radius: Theme.radius-control;
+        background: Theme.neutral-badge;
+        Glyph {
+            glyph: root.is-store ? Icons.store : Icons.app;
+            font-size: root.size * 0.55;
+            color: Theme.text-secondary;
+        }
+    }
+}
+
+// 미묘한 텍스트 버튼(하이퍼링크 버튼 스타일).
+export component LinkButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked();
+    border-radius: Theme.radius-control;
+    background: touch.pressed ? Theme.subtle-pressed : touch.has-hover ? Theme.subtle-hover : transparent;
+    height: 28px;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-action-default => { touch.clicked(); }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+            text: root.text;
+            color: root.enabled ? Theme.accent-text : Theme.text-tertiary;
+            vertical-alignment: center;
+            font-size: Theme.body;
+        }
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// 글리프 아이콘 버튼(제목 표시줄 옆 보조 동작).
+export component IconButton inherits Rectangle {
+    in property <string> glyph;
+    in property <string> label;
+    callback clicked();
+    width: 36px;
+    height: 36px;
+    border-radius: Theme.radius-control;
+    background: touch.pressed ? Theme.subtle-pressed : touch.has-hover ? Theme.subtle-hover : transparent;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { touch.clicked(); }
+    Glyph {
+        glyph: root.glyph;
+        color: Theme.text-primary;
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}

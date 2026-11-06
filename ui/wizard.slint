@@ -1,0 +1,484 @@
+// 제거 마법사(ContentDialog 스타일 모달).
+
+import { Button, Spinner, ProgressIndicator, ListView } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { Glyph, Badge, FluentCheck, InfoBar, AppIcon, LinkButton } from "widgets.slint";
+import { LeftoverItem, WizardStep, Wizard } from "types.slint";
+
+// 체크 상자 + 제목 + 설명 한 줄.
+component OptionRow inherits Rectangle {
+    in property <string> title;
+    in property <string> detail;
+    in-out property <bool> checked;
+    in property <bool> enabled: true;
+    min-height: 56px;
+    border-radius: Theme.radius-control;
+    background: touch.has-hover && enabled ? Theme.subtle-hover : transparent;
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.checked = !root.checked; }
+    }
+    HorizontalLayout {
+        padding: 10px;
+        padding-left: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            FluentCheck {
+                checked: root.checked;
+                enabled: root.enabled;
+                toggled => { root.checked = !root.checked; }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.title;
+                font-weight: Theme.semibold;
+                color: root.enabled ? Theme.text-primary : Theme.text-tertiary;
+            }
+            Text {
+                text: root.detail;
+                font-size: Theme.caption;
+                color: root.enabled ? Theme.text-secondary : Theme.text-tertiary;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+component LeftoverRow inherits Rectangle {
+    in property <LeftoverItem> item;
+    callback toggled();
+    height: 56px;
+    border-radius: Theme.radius-control;
+    background: touch.has-hover ? Theme.subtle-hover : transparent;
+    accessible-role: checkbox;
+    accessible-checkable: true;
+    accessible-checked: item.checked;
+    accessible-label: item.title + ", " + item.location;
+    accessible-action-default => { root.toggled(); }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.toggled(); }
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            FluentCheck {
+                checked: item.checked;
+                toggled => { root.toggled(); }
+            }
+        }
+        Glyph {
+            width: 20px;
+            glyph: item.kind == 0 ? Icons.folder
+                : item.kind == 1 ? Icons.document
+                : item.kind == 2 ? Icons.registry
+                : item.kind == 3 ? Icons.list
+                : item.kind == 4 ? Icons.service
+                : Icons.task;
+            color: Theme.text-secondary;
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text {
+                text: item.title;
+                font-weight: Theme.semibold;
+                color: Theme.text-primary;
+                overflow: elide;
+            }
+            Text {
+                text: item.reason + " · " + item.location;
+                font-size: Theme.caption;
+                color: Theme.text-secondary;
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Badge {
+                text: item.confidence == 2 ? "확실" : item.confidence == 1 ? "높음" : "낮음";
+                tone: item.confidence == 2 ? 1 : item.confidence == 1 ? 2 : 3;
+            }
+        }
+        Text {
+            width: 72px;
+            text: item.size-text;
+            font-size: Theme.caption;
+            color: Theme.text-secondary;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// 진행 중 화면(스피너 + 상태 문구).
+component BusyView inherits VerticalLayout {
+    in property <string> title;
+    in property <string> detail;
+    in property <string> hint;
+    alignment: center;
+    spacing: 12px;
+    padding: 32px;
+    HorizontalLayout {
+        alignment: center;
+        Spinner {
+            width: 48px;
+            height: 48px;
+            indeterminate: true;
+        }
+    }
+    Text {
+        text: root.title;
+        font-size: Theme.body-large;
+        font-weight: Theme.semibold;
+        color: Theme.text-primary;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+    Text {
+        text: root.detail;
+        color: Theme.text-secondary;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+    if root.hint != "": Text {
+        text: root.hint;
+        font-size: Theme.caption;
+        color: Theme.text-tertiary;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+}
+
+// 완료/실패 화면.
+component ResultView inherits VerticalLayout {
+    in property <bool> ok;
+    in property <string> title;
+    in property <string> detail;
+    alignment: center;
+    spacing: 16px;
+    padding: 32px;
+    HorizontalLayout {
+        alignment: center;
+        Rectangle {
+            width: 64px;
+            height: 64px;
+            border-radius: 32px;
+            background: root.ok ? Theme.success-background : Theme.critical-background;
+            Glyph {
+                glyph: root.ok ? Icons.success : Icons.error;
+                font-size: 32px;
+                color: root.ok ? Theme.success : Theme.critical;
+            }
+        }
+    }
+    Text {
+        text: root.title;
+        font-size: Theme.subtitle;
+        font-weight: Theme.semibold;
+        color: Theme.text-primary;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+    if root.detail != "": Rectangle {
+        border-radius: Theme.radius-overlay;
+        background: Theme.card-background-secondary;
+        border-width: 1px;
+        border-color: Theme.card-stroke;
+        VerticalLayout {
+            padding: 16px;
+            Text {
+                text: root.detail;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+export component UninstallDialog inherits Rectangle {
+    background: Theme.smoke;
+    // 모달: 뒤쪽 클릭 차단.
+    TouchArea { }
+
+    dialog := Rectangle {
+        width: min(680px, root.width - 48px);
+        // 목록이 있는 검토 단계만 크게, 나머지 단계는 내용에 맞는 높이로.
+        height: Wizard.step == WizardStep.review && Wizard.leftovers.length > 0
+            ? min(720px, root.height - 48px)
+            : min(540px, root.height - 48px);
+        animate height { duration: 200ms; easing: ease-out; }
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        background: Theme.dialog-background;
+        border-radius: Theme.radius-overlay;
+        border-width: 1px;
+        border-color: Theme.surface-stroke;
+        drop-shadow-blur: 32px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: #00000047;
+        clip: true;
+
+        VerticalLayout {
+            // ── 머리글 ──────────────────────────────────────
+            HorizontalLayout {
+                padding: 24px;
+                padding-bottom: 16px;
+                spacing: 16px;
+                AppIcon {
+                    size: 40px;
+                    icon: Wizard.target.icon;
+                    has-icon: Wizard.target.has-icon;
+                    is-store: Wizard.target.is-store;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: Wizard.target.name;
+                        font-size: Theme.subtitle;
+                        font-weight: Theme.semibold;
+                        color: Theme.text-primary;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: (Wizard.target.publisher != "" ? Wizard.target.publisher + " · " : "")
+                            + (Wizard.target.version != "" ? Wizard.target.version + " · " : "")
+                            + Wizard.target.size-text;
+                        font-size: Theme.caption;
+                        color: Theme.text-secondary;
+                        overflow: elide;
+                    }
+                }
+            }
+
+            // ── 본문 ────────────────────────────────────────
+            Rectangle {
+                vertical-stretch: 1;
+
+                if Wizard.step == WizardStep.confirm: VerticalLayout {
+                    padding-left: 24px;
+                    padding-right: 24px;
+                    padding-bottom: 16px;
+                    spacing: 12px;
+                    alignment: start;
+                    if Wizard.target.is-store: InfoBar {
+                        level: 1;
+                        message: "Microsoft Store 앱은 Windows 패키지 관리자로 제거한 뒤, 남은 데이터를 찾아 정리합니다.";
+                    }
+                    if !Wizard.target.is-store && Wizard.uninstaller-missing: InfoBar {
+                        level: 2;
+                        title: "제거 프로그램을 찾을 수 없습니다";
+                        message: "앱의 제거 프로그램이 없거나 손상되었습니다. 파일·레지스트리를 직접 정리하는 강제 제거로 진행합니다.";
+                    }
+                    Text {
+                        text: "이 앱을 제거하고, 제거 프로그램이 남긴 파일·폴더·레지스트리·바로가기·서비스·예약 작업까지 찾아 정리합니다.";
+                        color: Theme.text-primary;
+                        wrap: word-wrap;
+                    }
+                    Rectangle {
+                        border-radius: Theme.radius-overlay;
+                        background: Theme.card-background-secondary;
+                        border-width: 1px;
+                        border-color: Theme.card-stroke;
+                        VerticalLayout {
+                            padding: 4px;
+                            OptionRow {
+                                title: "시스템 복원 지점 만들기";
+                                detail: "문제가 생기면 Windows 시스템 복원으로 되돌릴 수 있습니다. 수십 초가 걸릴 수 있습니다.";
+                                checked <=> Wizard.restore-point;
+                            }
+                            if !Wizard.target.is-store: OptionRow {
+                                title: "자동(무인) 제거";
+                                detail: Wizard.quiet-supported
+                                    ? "제거 마법사 화면 없이 바로 제거합니다."
+                                    : "이 앱의 제거 프로그램은 무인 제거를 지원하지 않습니다.";
+                                enabled: Wizard.quiet-supported && !Wizard.force;
+                                checked <=> Wizard.quiet;
+                            }
+                            if !Wizard.target.is-store: OptionRow {
+                                title: "강제 제거";
+                                detail: "앱의 제거 프로그램을 실행하지 않고, 남은 파일과 레지스트리를 직접 정리합니다. 제거 프로그램이 고장 났을 때 사용하세요.";
+                                enabled: !Wizard.uninstaller-missing;
+                                checked <=> Wizard.force;
+                            }
+                        }
+                    }
+                    Text {
+                        text: "삭제 전에 남은 항목 목록을 확인할 수 있으며, 레지스트리와 예약 작업은 자동으로 백업됩니다.";
+                        font-size: Theme.caption;
+                        color: Theme.text-secondary;
+                        wrap: word-wrap;
+                    }
+                }
+
+                if Wizard.step == WizardStep.running: BusyView {
+                    title: Wizard.status-title;
+                    detail: Wizard.status-detail;
+                    hint: Wizard.elapsed;
+                }
+
+                if Wizard.step == WizardStep.scanning: BusyView {
+                    title: Wizard.status-title;
+                    detail: Wizard.status-detail;
+                    hint: "";
+                }
+
+                if Wizard.step == WizardStep.review: VerticalLayout {
+                    padding-left: 24px;
+                    padding-right: 24px;
+                    padding-bottom: 12px;
+                    spacing: 10px;
+                    if Wizard.banner != "": InfoBar {
+                        level: Wizard.banner-level;
+                        message: Wizard.banner;
+                    }
+                    if Wizard.leftovers.length > 0: HorizontalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: "남은 항목 " + Wizard.leftovers.length + "개 중 " + Wizard.selected-count + "개 선택 · " + Wizard.selected-size;
+                            color: Theme.text-primary;
+                            font-weight: Theme.semibold;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+                        LinkButton {
+                            text: "추천 항목";
+                            clicked => { Wizard.select(1); }
+                        }
+                        LinkButton {
+                            text: "모두 선택";
+                            clicked => { Wizard.select(2); }
+                        }
+                        LinkButton {
+                            text: "선택 해제";
+                            clicked => { Wizard.select(0); }
+                        }
+                    }
+                    if Wizard.leftovers.length > 0: Rectangle {
+                        vertical-stretch: 1;
+                        border-radius: Theme.radius-overlay;
+                        background: Theme.card-background-secondary;
+                        border-width: 1px;
+                        border-color: Theme.card-stroke;
+                        ListView {
+                            for it[i] in Wizard.leftovers: LeftoverRow {
+                                item: it;
+                                toggled => { Wizard.toggle(i); }
+                            }
+                        }
+                    }
+                    if Wizard.leftovers.length > 0: OptionRow {
+                        title: "파일을 휴지통으로 이동";
+                        detail: "영구 삭제 대신 휴지통으로 보내 필요하면 복원할 수 있게 합니다.";
+                        checked <=> Wizard.recycle;
+                    }
+                    if Wizard.leftovers.length == 0: ResultView {
+                        vertical-stretch: 1;
+                        ok: true;
+                        title: "남은 항목이 없습니다";
+                        detail: "앱이 깨끗하게 제거되었습니다.";
+                    }
+                }
+
+                if Wizard.step == WizardStep.cleaning: VerticalLayout {
+                    alignment: center;
+                    padding: 32px;
+                    spacing: 12px;
+                    Text {
+                        text: Wizard.status-title;
+                        font-size: Theme.body-large;
+                        font-weight: Theme.semibold;
+                        color: Theme.text-primary;
+                        horizontal-alignment: center;
+                    }
+                    ProgressIndicator {
+                        height: 4px;
+                        progress: Wizard.progress;
+                    }
+                    Text {
+                        text: Wizard.status-detail;
+                        color: Theme.text-secondary;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                if Wizard.step == WizardStep.done || Wizard.step == WizardStep.failed: ResultView {
+                    ok: Wizard.result-ok;
+                    title: Wizard.result-title;
+                    detail: Wizard.result-detail;
+                }
+            }
+
+            // ── 바닥글(버튼) ────────────────────────────────
+            Rectangle {
+                height: 80px;
+                background: Theme.dialog-footer;
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Theme.card-stroke;
+                }
+                HorizontalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+                    alignment: end;
+
+                    if Wizard.step == WizardStep.confirm: Button {
+                        text: "취소";
+                        clicked => { Wizard.cancel(); }
+                    }
+                    if Wizard.step == WizardStep.confirm: Button {
+                        text: Wizard.force || Wizard.uninstaller-missing ? "강제 제거 시작" : "제거 시작";
+                        primary: true;
+                        clicked => { Wizard.start(); }
+                    }
+
+                    if Wizard.step == WizardStep.running: Button {
+                        text: "기다리지 않고 다음 단계로";
+                        clicked => { Wizard.skip-wait(); }
+                    }
+
+                    if Wizard.step == WizardStep.review && Wizard.leftovers.length > 0: Button {
+                        text: "정리하지 않고 닫기";
+                        clicked => { Wizard.finish(); }
+                    }
+                    if Wizard.step == WizardStep.review && Wizard.leftovers.length > 0: Button {
+                        text: "선택 항목 삭제";
+                        primary: true;
+                        enabled: Wizard.selected-count > 0;
+                        clicked => { Wizard.clean(); }
+                    }
+                    if Wizard.step == WizardStep.review && Wizard.leftovers.length == 0: Button {
+                        text: "완료";
+                        primary: true;
+                        clicked => { Wizard.finish(); }
+                    }
+
+                    if Wizard.step == WizardStep.done && Wizard.has-backup: Button {
+                        text: "백업 폴더 열기";
+                        clicked => { Wizard.open-backup(); }
+                    }
+                    if Wizard.step == WizardStep.done || Wizard.step == WizardStep.failed: Button {
+                        text: Wizard.step == WizardStep.done ? "완료" : "닫기";
+                        primary: true;
+                        clicked => { Wizard.finish(); }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,433 @@
+// App Deleter 메인 창.
+
+import { Button, LineEdit, ComboBox, ListView, ProgressIndicator, Spinner, AboutSlint } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { Glyph, Badge, InfoBar, AppIcon, IconButton, LinkButton } from "widgets.slint";
+import { AppItem, LeftoverItem, WizardStep, Wizard } from "types.slint";
+import { UninstallDialog } from "wizard.slint";
+
+export { AppItem, LeftoverItem, WizardStep, Wizard }
+
+component AppRow inherits Rectangle {
+    in property <AppItem> app;
+    in property <bool> last;
+    callback uninstall();
+    height: 64px;
+
+    touch := TouchArea {
+        double-clicked => { root.uninstall(); }
+    }
+    Rectangle {
+        x: 4px;
+        width: parent.width - 8px;
+        border-radius: Theme.radius-control;
+        background: touch.has-hover ? Theme.subtle-hover : transparent;
+        animate background { duration: 100ms; easing: ease-out; }
+    }
+    if !root.last: Rectangle {
+        x: 16px;
+        y: parent.height - 1px;
+        width: parent.width - 32px;
+        height: 1px;
+        background: Theme.divider;
+    }
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 16px;
+        spacing: 16px;
+        VerticalLayout {
+            alignment: center;
+            AppIcon {
+                icon: app.icon;
+                has-icon: app.has-icon;
+                is-store: app.is-store;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: app.name;
+                    font-weight: Theme.semibold;
+                    color: Theme.text-primary;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+                if app.is-store: Badge {
+                    text: "Store";
+                    tone: 0;
+                }
+                if app.uninstaller-missing: Badge {
+                    text: "제거 프로그램 없음";
+                    tone: 3;
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            Text {
+                text: (app.publisher != "" ? app.publisher : "게시자 정보 없음")
+                    + (app.version != "" ? "  ·  " + app.version : "")
+                    + (app.date != "" ? "  ·  " + app.date : "");
+                font-size: Theme.caption;
+                color: Theme.text-secondary;
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            width: 132px;
+            alignment: center;
+            spacing: 6px;
+            Text {
+                text: app.size-pending ? "계산 중…" : (app.size-estimated ? "≈ " : "") + app.size-text;
+                font-weight: app.size-pending ? Theme.regular : Theme.semibold;
+                color: app.size-pending ? Theme.text-tertiary : Theme.text-primary;
+                horizontal-alignment: right;
+            }
+            Rectangle {
+                height: 4px;
+                border-radius: 2px;
+                background: Theme.divider;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * max(0.0, min(1.0, app.size-ratio));
+                    height: parent.height;
+                    border-radius: 2px;
+                    background: Theme.accent;
+                    opacity: app.size-pending ? 0 : 0.85;
+                    animate width { duration: 250ms; easing: ease-out; }
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                text: "제거";
+                clicked => { root.uninstall(); }
+            }
+        }
+    }
+}
+
+component AboutDialog inherits Rectangle {
+    in property <string> version;
+    in property <string> backup-path;
+    callback close();
+    callback open-backups();
+    background: Theme.smoke;
+    TouchArea {
+        clicked => { root.close(); }
+    }
+    panel := Rectangle {
+        width: min(520px, root.width - 48px);
+        height: inner.preferred-height;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        background: Theme.dialog-background;
+        border-radius: Theme.radius-overlay;
+        border-width: 1px;
+        border-color: Theme.surface-stroke;
+        drop-shadow-blur: 32px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: #00000047;
+        TouchArea { }
+        inner := VerticalLayout {
+            padding: 24px;
+            spacing: 12px;
+            HorizontalLayout {
+                spacing: 16px;
+                Image {
+                    width: 48px;
+                    height: 48px;
+                    source: @image-url("../assets/app-icon-256.png");
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: "App Deleter";
+                        font-size: Theme.subtitle;
+                        font-weight: Theme.semibold;
+                        color: Theme.text-primary;
+                    }
+                    Text {
+                        text: "버전 " + root.version + " · Windows 11 전용";
+                        font-size: Theme.caption;
+                        color: Theme.text-secondary;
+                    }
+                }
+            }
+            Text {
+                text: "앱의 제거 프로그램을 실행한 뒤 남은 파일·폴더·레지스트리·바로가기·서비스·예약 작업·시작 프로그램·방화벽 규칙까지 찾아 깨끗하게 정리합니다. 삭제한 레지스트리는 .reg 파일로 백업됩니다.";
+                color: Theme.text-primary;
+                wrap: word-wrap;
+            }
+            Text {
+                text: "백업 위치: " + root.backup-path;
+                font-size: Theme.caption;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                alignment: start;
+                LinkButton {
+                    text: "백업 폴더 열기";
+                    clicked => { root.open-backups(); }
+                }
+            }
+            HorizontalLayout {
+                alignment: center;
+                AboutSlint { }
+            }
+            HorizontalLayout {
+                alignment: end;
+                Button {
+                    text: "닫기";
+                    primary: true;
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "App Deleter — 앱 완전 삭제";
+    icon: @image-url("../assets/app-icon-256.png");
+    preferred-width: 1120px;
+    preferred-height: 780px;
+    min-width: 860px;
+    min-height: 560px;
+    background: Theme.window-background;
+    default-font-family: "Segoe UI Variable Text";
+    default-font-size: 14px;
+
+    in property <[AppItem]> apps;
+    in property <bool> loading: true;
+    in property <bool> sizing;
+    in property <float> sizing-progress;
+    in property <string> summary;
+    in property <string> version;
+    in property <bool> elevated: true;
+    in property <string> backup-path;
+    in-out property <string> query;
+    in-out property <int> filter-index;
+    in-out property <int> sort-index;
+    in-out property <bool> about-open;
+
+    callback search(string);
+    callback filter-changed(int);
+    callback sort-changed(int);
+    callback refresh();
+    callback uninstall(int);
+    callback relaunch-admin();
+    callback open-backups();
+
+    forward-focus: search-box;
+
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.F5 && !Wizard.open) {
+                root.refresh();
+                return accept;
+            }
+            if (event.text == Key.Escape) {
+                if (root.about-open) {
+                    root.about-open = false;
+                    return accept;
+                }
+                if (Wizard.open && Wizard.step == WizardStep.confirm) {
+                    Wizard.cancel();
+                    return accept;
+                }
+            }
+            if (event.text == "f" && event.modifiers.control) {
+                search-box.focus();
+                return accept;
+            }
+            return reject;
+        }
+
+        VerticalLayout {
+            // ── 머리글 ──────────────────────────────────────
+            VerticalLayout {
+                padding-left: Theme.page-padding;
+                padding-right: Theme.page-padding;
+                padding-top: 24px;
+                padding-bottom: 16px;
+                spacing: 16px;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            width: 36px;
+                            height: 36px;
+                            source: @image-url("../assets/app-icon-256.png");
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 0px;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: "앱 삭제";
+                            font-size: Theme.title;
+                            font-weight: Theme.semibold;
+                            color: Theme.text-primary;
+                        }
+                        Text {
+                            text: "앱을 제거하고 남은 파일·레지스트리까지 깨끗하게 정리합니다.";
+                            color: Theme.text-secondary;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            glyph: Icons.info;
+                            label: "정보";
+                            clicked => { root.about-open = true; }
+                        }
+                    }
+                }
+
+                if !root.elevated: InfoBar {
+                    level: 2;
+                    title: "관리자 권한 없이 실행 중입니다";
+                    message: "Program Files·HKLM 레지스트리·서비스 같은 잔여물은 관리자 권한이 있어야 지울 수 있습니다.";
+                    action-text: "관리자로 다시 실행";
+                    action => { root.relaunch-admin(); }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    search-box := LineEdit {
+                        horizontal-stretch: 1;
+                        placeholder-text: "앱 이름 또는 게시자 검색 (Ctrl+F)";
+                        text <=> root.query;
+                        edited(text) => { root.search(text); }
+                    }
+                    ComboBox {
+                        width: 168px;
+                        model: ["모든 앱", "데스크톱 앱", "Microsoft Store 앱"];
+                        current-index <=> root.filter-index;
+                        selected => { root.filter-changed(self.current-index); }
+                    }
+                    ComboBox {
+                        width: 168px;
+                        model: ["크기 큰 순", "이름순", "설치 날짜순", "게시자순"];
+                        current-index <=> root.sort-index;
+                        selected => { root.sort-changed(self.current-index); }
+                    }
+                    Button {
+                        text: "새로 고침";
+                        enabled: !root.loading;
+                        clicked => { root.refresh(); }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    height: 20px;
+                    Text {
+                        text: root.summary;
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    if root.sizing: Text {
+                        text: "폴더 크기 계산 중";
+                        font-size: Theme.caption;
+                        color: Theme.text-tertiary;
+                        vertical-alignment: center;
+                    }
+                    if root.sizing: VerticalLayout {
+                        alignment: center;
+                        width: 120px;
+                        ProgressIndicator {
+                            height: 3px;
+                            progress: root.sizing-progress;
+                        }
+                    }
+                }
+            }
+
+            // ── 앱 목록 카드 ────────────────────────────────
+            Rectangle {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding-left: Theme.page-padding;
+                    padding-right: Theme.page-padding;
+                    padding-bottom: 24px;
+                    Rectangle {
+                        border-radius: Theme.radius-overlay;
+                        background: Theme.card-background;
+                        border-width: 1px;
+                        border-color: Theme.card-stroke;
+                        clip: true;
+
+                        if root.loading: VerticalLayout {
+                            alignment: center;
+                            spacing: 12px;
+                            HorizontalLayout {
+                                alignment: center;
+                                Spinner {
+                                    width: 40px;
+                                    height: 40px;
+                                    indeterminate: true;
+                                }
+                            }
+                            Text {
+                                text: "설치된 앱을 불러오는 중…";
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        if !root.loading && root.apps.length == 0: VerticalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            Glyph {
+                                glyph: Icons.search;
+                                font-size: 32px;
+                                color: Theme.text-tertiary;
+                            }
+                            Text {
+                                text: root.query != "" ? "검색 결과가 없습니다" : "표시할 앱이 없습니다";
+                                font-size: Theme.body-large;
+                                font-weight: Theme.semibold;
+                                color: Theme.text-primary;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        if !root.loading && root.apps.length > 0: ListView {
+                            for app[i] in root.apps: AppRow {
+                                app: app;
+                                last: i == root.apps.length - 1;
+                                uninstall => { root.uninstall(app.id); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if Wizard.open: UninstallDialog {
+        width: root.width;
+        height: root.height;
+    }
+
+    if root.about-open: AboutDialog {
+        width: root.width;
+        height: root.height;
+        version: root.version;
+        backup-path: root.backup-path;
+        close => { root.about-open = false; }
+        open-backups => { root.open-backups(); }
+    }
+}

@@ -1,0 +1,76 @@
+// Rust ↔ UI 데이터 구조와 전역 상태.
+
+// 앱 목록의 한 행.
+export struct AppItem {
+    id: int,
+    name: string,
+    publisher: string,
+    version: string,
+    date: string,
+    size-text: string,
+    // 가장 큰 앱 대비 비율(0~1) — 크기 막대 표시용.
+    size-ratio: float,
+    // 실제 폴더 크기를 아직 계산 중인지.
+    size-pending: bool,
+    // 레지스트리 추정치(폴더 크기를 잴 수 없음)인지.
+    size-estimated: bool,
+    icon: image,
+    has-icon: bool,
+    is-store: bool,
+    uninstaller-missing: bool,
+}
+
+// 잔여물 목록의 한 행.
+export struct LeftoverItem {
+    title: string,
+    location: string,
+    reason: string,
+    // 0 폴더, 1 파일, 2 레지스트리 키, 3 레지스트리 값, 4 서비스, 5 예약 작업
+    kind: int,
+    // 0 낮음, 1 높음, 2 확실
+    confidence: int,
+    size-text: string,
+    checked: bool,
+}
+
+export enum WizardStep { confirm, running, scanning, review, cleaning, done, failed }
+
+// 제거 마법사 상태.
+export global Wizard {
+    in-out property <bool> open;
+    in property <WizardStep> step;
+    in property <AppItem> target;
+    in property <bool> quiet-supported;
+    in property <bool> uninstaller-missing;
+    in-out property <bool> restore-point;
+    in-out property <bool> quiet;
+    in-out property <bool> force;
+    in-out property <bool> recycle: true;
+
+    in property <string> status-title;
+    in property <string> status-detail;
+    in property <string> elapsed;
+    in property <float> progress;
+
+    in property <[LeftoverItem]> leftovers;
+    in property <int> selected-count;
+    in property <string> selected-size;
+    in property <string> banner;
+    // 1 정보, 2 주의, 3 위험, 4 성공
+    in property <int> banner-level: 1;
+
+    in property <string> result-title;
+    in property <string> result-detail;
+    in property <bool> result-ok;
+    in property <bool> has-backup;
+
+    callback start();
+    callback skip-wait();
+    callback toggle(int);
+    // 0 모두 해제, 1 추천 항목, 2 모두 선택
+    callback select(int);
+    callback clean();
+    callback finish();
+    callback cancel();
+    callback open-backup();
+}
